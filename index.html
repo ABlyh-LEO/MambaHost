@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mamba Audio Host</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="glass-panel">
+            <div class="logo">
+                <span class="gradient-text">Mamba</span> Host
+            </div>
+            <div class="connection-control">
+                <div class="status-indicator" id="connStatusDot"></div>
+                <span id="connStatusText">Disconnected</span>
+                <button id="btnConnect" class="btn primary">Connect Serial</button>
+            </div>
+        </header>
+
+        <!-- Main Grid Layout -->
+        <main class="dashboard-grid">
+            
+            <!-- Left Column -->
+            <div class="col-left">
+                
+                <!-- System Status Section -->
+                <section class="glass-panel card">
+                    <div class="card-header">
+                        <h2>System Status</h2>
+                        <button id="btnRefreshStatus" class="btn icon-btn" title="Refresh Status">⟳</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-grid">
+                            <div class="status-item">
+                                <span class="label">Battery Voltage</span>
+                                <span class="value" id="statBatteryVolt">-- mV</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">Battery %</span>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="statBatteryBar" style="width: 0%;"></div>
+                                </div>
+                                <span class="value small" id="statBatteryPct">--%</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">System State</span>
+                                <span class="value" id="statSysState">--</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">I2C Available</span>
+                                <span class="value" id="statI2c">--</span>
+                            </div>
+                            <div class="status-item full-width">
+                                <span class="label">Flash Storage</span>
+                                <div class="progress-bar storage">
+                                    <div class="progress-fill" id="statStorageBar" style="width: 0%;"></div>
+                                </div>
+                                <span class="value small" id="statStorageText">-- / --</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Audio Upload Section -->
+                <section class="glass-panel card">
+                    <div class="card-header">
+                        <h2>Upload Audio</h2>
+                    </div>
+                    <div class="card-body upload-section">
+                        <div class="file-drop-area" id="fileDropArea">
+                            <span class="drop-icon">🎵</span>
+                            <span class="drop-msg">Drag & Drop Audio File here or Click to Select</span>
+                            <input type="file" id="fileInput" accept="audio/*">
+                        </div>
+                        <div class="upload-controls">
+                            <div class="control-group">
+                                <label for="uploadTrackIdx">Target Track Index:</label>
+                                <input type="number" id="uploadTrackIdx" min="0" max="63" value="0">
+                            </div>
+                            <div class="control-group">
+                                <label for="uploadSampleRate">Format:</label>
+                                <select id="uploadSampleRate">
+                                    <option value="16000_8">16 kHz / 8-bit RAW</option>
+                                    <option value="16000_16">16 kHz / 16-bit RAW</option>
+                                    <option value="8000_8">8 kHz / 8-bit RAW</option>
+                                </select>
+                            </div>
+                            <button id="btnUpload" class="btn primary full-width" disabled>Upload to Device</button>
+                        </div>
+                        
+                        <!-- Upload Progress -->
+                        <div class="upload-progress-container" id="uploadProgressContainer" style="display: none;">
+                            <span id="uploadStatusText">Converting...</span>
+                            <div class="progress-bar">
+                                <div class="progress-fill progress-active" id="uploadProgressBar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Right Column -->
+            <div class="col-right">
+                
+                <!-- Track Management Section -->
+                <section class="glass-panel card full-height">
+                    <div class="card-header">
+                        <h2>Audio Tracks</h2>
+                        <div class="header-actions">
+                            <button id="btnRefreshList" class="btn icon-btn" title="Refresh List">⟳</button>
+                            <button id="btnDefrag" class="btn warning outline" title="Defrag Flash">Defrag</button>
+                            <button id="btnFormat" class="btn danger outline" title="Format All">Format All</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="track-table">
+                                <thead>
+                                    <tr>
+                                        <th>Idx</th>
+                                        <th>Size (Bytes)</th>
+                                        <th>Sample Rate</th>
+                                        <th>Duration (~s)</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trackListBody">
+                                    <!-- Dynamic rows will be inserted here -->
+                                    <tr><td colspan="5" class="empty-msg">No tracks found. Connect and refresh.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/audio.js"></script>
+    <script src="js/serial.js"></script>
+    <script src="js/protocol.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
