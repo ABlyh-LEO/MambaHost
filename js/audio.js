@@ -7,11 +7,11 @@ class AudioProcessor {
     /**
      * Parse and convert audio file to ArrayBuffer
      * @param {File} file The original audio file (mp3, wav, etc.)
-     * @param {number} targetSampleRate e.g. 16000 or 8000
+     * @param {number} targetSampleRate e.g. 32000 or 16000
      * @param {number} targetBits 8 or 16
      * @returns {Promise<{buffer: Uint8Array, sampleRate: number, bits: number, duration: number}>}
      */
-    static async convertToRaw(file, targetSampleRate = 16000, targetBits = 8) {
+    static async convertToRaw(file, targetSampleRate = 32000, targetBits = 8) {
         try {
             const arrayBuffer = await file.arrayBuffer();
             
