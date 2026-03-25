@@ -31,7 +31,22 @@ document.addEventListener("DOMContentLoaded", () => {
         
         uploadProgressContainer: document.getElementById('uploadProgressContainer'),
         uploadProgressBar: document.getElementById('uploadProgressBar'),
-        uploadStatusText: document.getElementById('uploadStatusText')
+        uploadStatusText: document.getElementById('uploadStatusText'),
+
+        btnBattDetails: document.getElementById('btnBattDetails'),
+        battModal: document.getElementById('battModal'),
+        closeBattModal: document.getElementById('closeBattModal'),
+        
+        detCap: document.getElementById('detCap'),
+        detCycles: document.getElementById('detCycles'),
+        detDate: document.getElementById('detDate'),
+        detLife: document.getElementById('detLife'),
+        detVolt: document.getElementById('detVolt'),
+        detCurr: document.getElementById('detCurr'),
+        detTemp: document.getElementById('detTemp'),
+        detPct: document.getElementById('detPct'),
+        detState: document.getElementById('detState'),
+        detErrors: document.getElementById('detErrors')
     };
 
     let selectedFile = null;
@@ -93,6 +108,64 @@ document.addEventListener("DOMContentLoaded", () => {
         
         elements.statStorageText.innerText = `${usedMb} MB / ${totalMb} MB`;
         elements.statStorageBar.style.width = Math.min(100, usedPct) + "%";
+    };
+
+    // --- Battery Details Modal ---
+    elements.btnBattDetails.addEventListener('click', () => {
+        if (!serial.isConnected) return;
+        
+        // Show loading or just wait
+        protocol.onGenericAck = (err) => {
+            protocol.onGenericAck = null;
+            if (err) alert("Battery details: " + err);
+        };
+        protocol.queryBattInfo();
+    });
+
+    elements.closeBattModal.addEventListener('click', () => {
+        elements.battModal.style.display = 'none';
+    });
+
+    // Close on click outside
+    window.addEventListener('click', (e) => {
+        if (e.target === elements.battModal) elements.battModal.style.display = 'none';
+    });
+
+    protocol.onBattInfoResponse = (info) => {
+        elements.battModal.style.display = 'flex';
+        
+        elements.detCap.innerText = info.designedCapacity + " mAh";
+        elements.detCycles.innerText = info.loopTimes;
+        
+        // Parse date (bit[15:9]+1980, bit[8:5], bit[4:0])
+        const year = ((info.productionDateRaw >> 9) & 0x7F) + 1980;
+        const month = (info.productionDateRaw >> 5) & 0x0F;
+        const day = info.productionDateRaw & 0x1F;
+        elements.detDate.innerText = `${year}-${month}-${day}`;
+        
+        elements.detLife.innerText = info.batteryLife + " %";
+        elements.detVolt.innerText = info.voltageMv + " mV";
+        elements.detCurr.innerText = info.currentMa + " mA";
+        elements.detTemp.innerText = (info.temperature / 10).toFixed(1) + " °C";
+        elements.detPct.innerText = info.capacityPercent + " %";
+
+        // Internal State (bit[1]=conn, bit[0]=high_curr)
+        const conn = (info.internalState >> 1) & 0x01;
+        const highCurr = info.internalState & 0x01;
+        elements.detState.innerText = `${conn ? "Battery Linked" : "Battery Error"} | ${highCurr ? "High Current" : "Low Current"}`;
+
+        // Error State
+        const errorBits = [
+            { bit: 0, msg: "Short Circuit" },
+            { bit: 1, msg: "Overload" },
+            { bit: 2, msg: "Over Current" },
+            { bit: 3, msg: "Over Temp" },
+            { bit: 4, msg: "Under Volt" },
+            { bit: 5, msg: "Cell Error" },
+            { bit: 6, msg: "Self-Check Fail" }
+        ];
+        let errors = errorBits.filter(eb => (info.errorState >> eb.bit) & 0x01).map(eb => eb.msg);
+        elements.detErrors.innerText = errors.length > 0 ? errors.join(", ") : "None";
     };
 
     // --- Track Management ---

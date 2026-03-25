@@ -428,8 +428,71 @@ header {
 }
 
 /* Responsive */
-@media (max-width: 900px) {
-    .dashboard-grid {
+/* CSS for Battery Details */
+.i2c-status-row {
+    display: flex;
+    align-items: center;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: modalIn 0.3s ease-out;
+}
+
+@keyframes modalIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.details-group h3 {
+    font-size: 0.9rem;
+    color: var(--accent);
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 4px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+}
+
+.detail-row .label {
+    color: var(--text-sec);
+}
+
+.error-text {
+    color: var(--danger);
+    font-weight: 500;
+}
+
+@media (max-width: 500px) {
+    .details-grid {
         grid-template-columns: 1fr;
     }
 }

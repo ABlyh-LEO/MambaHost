@@ -17,7 +17,9 @@ const PROTOCOL = {
     CMD_FORMAT_ALL: 0x31,
     CMD_QUERY_STATUS: 0x32,
     CMD_STATUS_RESPONSE: 0x33,
-    CMD_DEFRAG: 0x34
+    CMD_DEFRAG: 0x34,
+    CMD_QUERY_BATT_INFO: 0x35,
+    CMD_BATT_INFO_RESPONSE: 0x36
 };
 
 const ERROR_CODE = {
@@ -25,7 +27,8 @@ const ERROR_CODE = {
     1: "TRACK_NOT_FOUND",
     2: "NO_SPACE",
     3: "BAD_PARAM",
-    4: "OP_FAILED"
+    4: "OP_FAILED",
+    5: "I2C_OFFLINE"
 };
 
 /**
@@ -46,6 +49,7 @@ class ProtocolManager {
         this.onTransferAck = null;
         this.onTransferNak = null;
         this.onGenericAck = null;
+        this.onBattInfoResponse = null;
 
         // Pipe serial data to protocol parser
         this.serial.onData((data) => this._pushData(data));
@@ -141,6 +145,9 @@ class ProtocolManager {
             case PROTOCOL.CMD_STATUS_RESPONSE:
                 this._parseStatusResponse(data);
                 break;
+            case PROTOCOL.CMD_BATT_INFO_RESPONSE:
+                this._parseBattInfoResponse(data);
+                break;
             default:
                 console.log("Unknown packet cmd:", cmd);
         }
@@ -183,6 +190,33 @@ class ProtocolManager {
         });
     }
 
+    _parseBattInfoResponse(data) {
+        if (!this.onBattInfoResponse) return;
+        let dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        let pos = 0;
+        
+        // Match BatteryInfo struct in battery_rack.hpp
+        // Static
+        let designedCapacity = dv.getUint32(pos, true); pos += 4;
+        let loopTimes = dv.getUint16(pos, true); pos += 2;
+        let productionDateRaw = dv.getUint16(pos, true); pos += 2;
+        let batteryLife = dv.getUint8(pos++);
+        
+        // Dynamic
+        let voltageMv = dv.getInt32(pos, true); pos += 4;
+        let currentMa = dv.getInt32(pos, true); pos += 4;
+        let temperature = dv.getInt16(pos, true); pos += 2;
+        let capacityPercent = dv.getUint8(pos++);
+        let internalState = dv.getUint8(pos++);
+        let errorState = dv.getUint8(pos++);
+
+        this.onBattInfoResponse({
+            designedCapacity, loopTimes, productionDateRaw, batteryLife,
+            voltageMv, currentMa, temperature, capacityPercent,
+            internalState, errorState
+        });
+    }
+
     /**
      * Send generic command (no data or simple payload)
      */
@@ -214,6 +248,7 @@ class ProtocolManager {
     async deleteTrack(idx) { await this.sendCommand(PROTOCOL.CMD_DELETE_TRACK, new Uint8Array([idx])); }
     async defrag() { await this.sendCommand(PROTOCOL.CMD_DEFRAG); }
     async formatAll() { await this.sendCommand(PROTOCOL.CMD_FORMAT_ALL); }
+    async queryBattInfo() { await this.sendCommand(PROTOCOL.CMD_QUERY_BATT_INFO); }
 
     // Upload Data Helpers
     async startTransfer(trackIdx, totalSize, sampleRate, bits) {

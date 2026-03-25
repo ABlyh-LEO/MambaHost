@@ -52,7 +52,10 @@
                             </div>
                             <div class="status-item">
                                 <span class="label">I2C Available</span>
-                                <span class="value" id="statI2c">--</span>
+                                <div class="i2c-status-row">
+                                    <span class="value" id="statI2c">--</span>
+                                    <button id="btnBattDetails" class="btn btn-small outline" style="margin-left: 10px;">Details</button>
+                                </div>
                             </div>
                             <div class="status-item full-width">
                                 <span class="label">Flash Storage</span>
@@ -64,6 +67,39 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- Battery Details Modal (Hidden by default) -->
+                <div id="battModal" class="modal-overlay" style="display: none;">
+                    <div class="modal-content glass-panel card">
+                        <div class="card-header">
+                            <h2>I2C Battery Details</h2>
+                            <button id="closeBattModal" class="btn icon-btn">✕</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="details-grid">
+                                <div class="details-group">
+                                    <h3>Static Info</h3>
+                                    <div class="detail-row"><span class="label">Designed Capacity:</span><span id="detCap">--</span></div>
+                                    <div class="detail-row"><span class="label">Cycles:</span><span id="detCycles">--</span></div>
+                                    <div class="detail-row"><span class="label">Date:</span><span id="detDate">--</span></div>
+                                    <div class="detail-row"><span class="label">Health:</span><span id="detLife">--</span></div>
+                                </div>
+                                <div class="details-group">
+                                    <h3>Dynamic Info</h3>
+                                    <div class="detail-row"><span class="label">Voltage:</span><span id="detVolt">--</span></div>
+                                    <div class="detail-row"><span class="label">Current:</span><span id="detCurr">--</span></div>
+                                    <div class="detail-row"><span class="label">Temp:</span><span id="detTemp">--</span></div>
+                                    <div class="detail-row"><span class="label">Percent:</span><span id="detPct">--</span></div>
+                                </div>
+                                <div class="details-group full-width">
+                                    <h3>Status & Errors</h3>
+                                    <div class="detail-row"><span class="label">Internal State:</span><span id="detState">--</span></div>
+                                    <div class="detail-row error-text"><span class="label">Errors:</span><span id="detErrors">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Audio Upload Section -->
                 <section class="glass-panel card">
