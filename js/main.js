@@ -48,9 +48,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 await serial.connect(1000000); // 1Mbps
                 updateConnectionUI(true);
                 
-                // Fetch initial data
-                protocol.queryStatus();
-                protocol.queryList();
+                // Fetch initial data (序列化发送, 避免背靠背导致 MCU UART 溢出)
+                await protocol.queryStatus();
+                await new Promise(r => setTimeout(r, 200));
+                await protocol.queryList();
                 
                 // Auto refresh status every 2.5 seconds
                 statusInterval = setInterval(() => protocol.queryStatus(), 2500);
@@ -215,11 +216,22 @@ document.addEventListener("DOMContentLoaded", () => {
         elements.uploadStatusText.innerText = "Processing Audio...";
         elements.uploadProgressBar.style.width = '5%';
 
+        // 立即停止状态轮询！必须在音频转换之前停止，
+        // 否则转换完成后发送 START_TRANSFER 可能与最后一次 queryStatus 包冲突
+        // （MCU 的 DMA 在处理完第一个包后停止，第二个包会丢失）
+        if (statusInterval) {
+            clearInterval(statusInterval);
+            statusInterval = null;
+        }
+
         try {
             // 1. Convert Audio
             const pcmData = await window.AudioProcessor.convertToRaw(selectedFile, targetSampleRate, targetBits);
             
-            // 2. Start Transfer Protocol
+            // 2. 等待 200ms 确保 MCU 已处理完所有挂起的包并重新激活 DMA
+            await new Promise(r => setTimeout(r, 200));
+
+            // 3. Start Transfer Protocol
             await protocolUploadLoop(trackIdx, pcmData);
             
         } catch (err) {
@@ -228,6 +240,10 @@ document.addEventListener("DOMContentLoaded", () => {
         } finally {
             elements.btnUpload.disabled = false;
             elements.fileInput.disabled = false;
+            // 恢复状态轮询（如果上传期间未恢复的话）
+            if (!statusInterval && serial.isConnected) {
+                statusInterval = setInterval(() => protocol.queryStatus(), 2500);
+            }
         }
     });
 
@@ -236,23 +252,40 @@ document.addEventListener("DOMContentLoaded", () => {
             const buffer = pcmData.buffer;
             const totalSize = buffer.length;
             const totalPackets = Math.ceil(totalSize / window.PROTOCOL.PACKET_DATA_SIZE);
-            const ACK_INTERVAL = 8;
+            const ACK_INTERVAL = 1; // Sync with MCU: wait for ACK after every packet
             
             let seq = 1;
             let expectedAckSeq = 0;
+            let startAckTimeout = null;
             
             elements.uploadStatusText.innerText = "Requesting Upload Space...";
             
-            // Wait for NAK or ACK for START command
-            protocol.onTransferNak = (errStr) => {
+            function cleanup() {
                 protocol.onTransferAck = null;
                 protocol.onTransferNak = null;
+                if (startAckTimeout) { clearTimeout(startAckTimeout); startAckTimeout = null; }
+                // 恢复状态轮询
+                if (serial.isConnected) {
+                    statusInterval = setInterval(() => protocol.queryStatus(), 2500);
+                }
+            }
+
+            // Wait for NAK or ACK for START command
+            protocol.onTransferNak = (errStr) => {
+                cleanup();
                 reject(new Error(errStr));
             };
+
+            // 30秒超时（Flash擦除大文件可能需要较长时间）
+            startAckTimeout = setTimeout(() => {
+                cleanup();
+                reject(new Error("Timeout waiting for device response (30s). Device may be busy erasing flash."));
+            }, 30000);
 
             protocol.onTransferAck = async (ackSeq) => {
                 // If it's ACK for START_TRANSFER (seq 0)
                 if (ackSeq === 0 && seq === 1) {
+                    if (startAckTimeout) { clearTimeout(startAckTimeout); startAckTimeout = null; }
                     sendNextBatch();
                 } 
                 // Ack for batch
@@ -262,8 +295,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         // All packets sent and acknowledged, END transfer
                         elements.uploadStatusText.innerText = "Finalizing upload...";
                         protocol.onTransferAck = (finalAck) => {
-                            protocol.onTransferAck = null;
-                            protocol.onTransferNak = null;
+                            if (startAckTimeout) { clearTimeout(startAckTimeout); startAckTimeout = null; }
+                            cleanup();
                             elements.uploadStatusText.innerText = "Upload Complete!";
                             elements.uploadProgressBar.style.width = '100%';
                             protocol.queryList(); // refresh list
@@ -271,6 +304,14 @@ document.addEventListener("DOMContentLoaded", () => {
                             setTimeout(() => { elements.uploadProgressContainer.style.display = 'none'; }, 2000);
                             resolve();
                         };
+                        
+                        // Restart timeout for END_TRANSFER ACK
+                        if (startAckTimeout) clearTimeout(startAckTimeout);
+                        startAckTimeout = setTimeout(() => {
+                            cleanup();
+                            reject(new Error("Timeout waiting for final ACK."));
+                        }, 5000);
+                        
                         await protocol.endTransfer();
                     } else {
                         // send next batch
@@ -280,22 +321,30 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             async function sendNextBatch() {
+                // Reset timeout for the next batch ACK
+                if (startAckTimeout) clearTimeout(startAckTimeout);
+                startAckTimeout = setTimeout(() => {
+                    cleanup();
+                    reject(new Error(`Timeout waiting for ACK after packet ${seq-1}.`));
+                }, 5000);
+
                 let limit = Math.min(seq + ACK_INTERVAL - 1, totalPackets);
                 for (; seq <= limit; seq++) {
                     let offset = (seq - 1) * window.PROTOCOL.PACKET_DATA_SIZE;
                     let chunk = buffer.subarray(offset, Math.min(offset + window.PROTOCOL.PACKET_DATA_SIZE, totalSize));
                     await protocol.sendDataPacket(seq, chunk);
                     
-                    if (seq % 10 === 0 || seq === totalPackets) {
-                        let pct = Math.floor((seq / totalPackets) * 100);
-                        elements.uploadProgressBar.style.width = pct + "%";
-                        elements.uploadStatusText.innerText = `Uploading... ${pct}%`;
-                    }
+                    let pct = Math.floor((seq / totalPackets) * 100);
+                    elements.uploadProgressBar.style.width = pct + "%";
+                    elements.uploadStatusText.innerText = `Uploading... ${pct}%`;
                 }
             }
 
             // Initiate
-            protocol.startTransfer(trackIdx, totalSize, pcmData.sampleRate, pcmData.bits).catch(reject);
+            protocol.startTransfer(trackIdx, totalSize, pcmData.sampleRate, pcmData.bits).catch(err => {
+                cleanup();
+                reject(err);
+            });
         });
     }
 });
