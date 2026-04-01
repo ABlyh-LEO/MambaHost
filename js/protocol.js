@@ -19,7 +19,8 @@ const PROTOCOL = {
     CMD_STATUS_RESPONSE: 0x33,
     CMD_DEFRAG: 0x34,
     CMD_QUERY_BATT_INFO: 0x35,
-    CMD_BATT_INFO_RESPONSE: 0x36
+    CMD_BATT_INFO_RESPONSE: 0x36,
+    CMD_CONTROL_AUDIO: 0x37
 };
 
 const ERROR_CODE = {
@@ -249,6 +250,11 @@ class ProtocolManager {
     async defrag() { await this.sendCommand(PROTOCOL.CMD_DEFRAG); }
     async formatAll() { await this.sendCommand(PROTOCOL.CMD_FORMAT_ALL); }
     async queryBattInfo() { await this.sendCommand(PROTOCOL.CMD_QUERY_BATT_INFO); }
+
+    async controlAudio(action, trackIdx) {
+        let data = new Uint8Array([action, trackIdx]);
+        await this.sendCommand(PROTOCOL.CMD_CONTROL_AUDIO, data);
+    }
 
     // Upload Data Helpers
     async startTransfer(trackIdx, totalSize, sampleRate, bits) {

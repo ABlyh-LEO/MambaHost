@@ -18,6 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
         statStorageText: document.getElementById('statStorageText'),
 
         btnRefreshList: document.getElementById('btnRefreshList'),
+        btnStopAudio: document.getElementById('btnStopAudio'),
         btnDefrag: document.getElementById('btnDefrag'),
         btnFormat: document.getElementById('btnFormat'),
         trackListBody: document.getElementById('trackListBody'),
@@ -98,7 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
         elements.statBatteryPct.innerText = status.batteryPercent + " %";
         elements.statBatteryBar.style.width = Math.min(100, status.batteryPercent) + "%";
         
-        const stateMap = ["Normal", "LowBattery", "Muted", "Transfer"];
+        const stateMap = ["Normal", "LowBattery", "Muted", "Transfer", "SerialAudio"];
         elements.statSysState.innerText = stateMap[status.systemState] || status.systemState;
         elements.statI2c.innerText = status.i2cAvailable ? "Ready" : "Offline";
 
@@ -173,6 +174,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (serial.isConnected) protocol.queryList();
     });
 
+    elements.btnStopAudio.addEventListener('click', () => {
+        if (!serial.isConnected) return;
+        protocol.controlAudio(0, 0); // 0 = Stop action
+    });
+
     elements.btnDefrag.addEventListener('click', () => {
         if (!serial.isConnected) return;
         if (confirm("Defrag may take some time and you CANNOT power off the device. Proceed?")) {
@@ -207,20 +213,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td>${t.sampleRate} Hz</td>
                 <td>${duration} s</td>
                 <td class="action-btns">
-                    <button class="btn btn-small danger outline" data-idx="${t.index}">Delete</button>
+                    <button class="btn btn-small primary outline btn-play-audio" data-idx="${t.index}">Play</button>
+                    <button class="btn btn-small danger outline btn-delete-track" data-idx="${t.index}">Delete</button>
                 </td>
             `;
             elements.trackListBody.appendChild(tr);
         });
 
         // Add delete listeners
-        document.querySelectorAll('.action-btns button').forEach(btn => {
+        document.querySelectorAll('.btn-delete-track').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 let idx = e.target.getAttribute('data-idx');
                 if (confirm(`Delete track ${idx}?`)) {
                     setGenericAction("Deleting...");
                     protocol.deleteTrack(parseInt(idx));
                 }
+            });
+        });
+
+        // Add play listeners
+        document.querySelectorAll('.btn-play-audio').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                let idx = e.target.getAttribute('data-idx');
+                if (serial.isConnected) protocol.controlAudio(1, parseInt(idx)); // 1 = Play action
             });
         });
     };
